@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { Station } from "@/types/station";
 import {
   fetchStations,
@@ -6,55 +7,22 @@ import {
   getUniqueCities,
 } from "@/lib/api";
 
-type StationsState = {
-  data: Station[];
-  loading: boolean;
-  error: string | null;
-};
-
-const initialState: StationsState = {
-  data: [],
-  loading: true,
-  error: null,
-};
-
 export function useStations(selectedCity: string | null) {
-  const [state, setState] = useState<StationsState>(initialState);
+  const { data, isLoading, error } = useQuery<Station[], Error>({
+    queryKey: ["stations"],
+    queryFn: fetchStations,
+  });
 
-  useEffect(() => {
-    const controller = new AbortController();
-
-    fetchStations()
-      .then((data) => {
-        if (!controller.signal.aborted) {
-          setState({ data, loading: false, error: null });
-        }
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) {
-          setState({
-            data: [],
-            loading: false,
-            error:
-              err instanceof Error ? err.message : "Failed to fetch stations",
-          });
-        }
-      });
-
-    return () => controller.abort();
-  }, []);
-
-  const cities = useMemo(() => getUniqueCities(state.data), [state.data]);
-
+  const cities = useMemo(() => (data ? getUniqueCities(data) : []), [data]);
   const stations = useMemo(
-    () => filterStationsByCity(state.data, selectedCity),
-    [state.data, selectedCity]
+    () => (data ? filterStationsByCity(data, selectedCity) : []),
+    [data, selectedCity]
   );
 
   return {
     stations,
     cities,
-    loading: state.loading,
-    error: state.error,
+    loading: isLoading,
+    error: error?.message ?? null,
   };
 }
